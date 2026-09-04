@@ -59,8 +59,6 @@ public:
 
 private:
 
-    // void moveEntityToSignature(EntityId entity_id, ComponentId component_id, bool add_component);
-
     void migrateEntity(EntityId entity_id, ComponentId component_id);
 
     static void normalizeSignature(Signature& signature);
@@ -80,7 +78,6 @@ private:
     std::unordered_map<ComponentId, ComponentSchema> component_schemas;
     std::unordered_map<EntityId, EntityRecord> entity_records;
     std::unordered_map<Signature, std::unique_ptr<Archetype>, Archetype::Hash> archetypes;
-    std::unordered_map<Signature, Archetype::Edge, Archetype::Hash> archetype_map;
 };
 
 } // namespace ecs
