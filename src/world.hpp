@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -49,7 +50,8 @@ public:
     // Returns every archetype whose signature is a superset of component_ids.
     std::vector<Archetype*> query(std::span<const ComponentId> component_ids);
 
-    const ComponentSchema& getComponentSchema(ComponentId component_id);
+    ComponentSchema& getComponentSchema(ComponentId component_id);
+    ComponentSchema& getComponentSchema(const std::string& component_name);
 
     const EntityRecord& getEntityRecord(EntityId entity_id);
 
@@ -78,6 +80,8 @@ private:
     std::unordered_map<ComponentId, ComponentSchema> component_schemas;
     std::unordered_map<EntityId, EntityRecord> entity_records;
     std::unordered_map<Signature, std::unique_ptr<Archetype>, Archetype::Hash> archetypes;
+
+    std::unordered_map<std::string, ComponentSchema&> component_schema_map;
 };
 
 } // namespace ecs

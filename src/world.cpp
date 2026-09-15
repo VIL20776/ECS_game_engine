@@ -49,7 +49,8 @@ ComponentId World::createComponent(std::string_view name, const std::vector<Comp
     }
 
     const ComponentId component_id = schema.id;
-    component_schemas.emplace(component_id, std::move(schema));
+    auto [item, inserted] = component_schemas.emplace(component_id, std::move(schema));
+    component_schema_map.emplace(name, item->second);
     return component_id;
 }
 
@@ -124,8 +125,11 @@ World::query(std::span<const ComponentId> component_ids)
     return result;
 }
 
-const ComponentSchema&
+ComponentSchema&
 World::getComponentSchema(ComponentId component_id) { return component_schemas.at(component_id); }
+
+ComponentSchema&
+World::getComponentSchema(const std::string& component_name) { return component_schema_map.at(component_name); }
 
 const EntityRecord&
 World::getEntityRecord(EntityId entity_id) { return entity_records.at(entity_id); }

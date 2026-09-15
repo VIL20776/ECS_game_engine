@@ -3,9 +3,9 @@
 #include <cstdio>
 #include <expected>
 #include <iostream>
-#include <memory>
 #include <print>
 #include <string>
+#include <string_view>
 #include <toml++/toml.hpp>
 #include <unordered_map>
 
@@ -19,13 +19,13 @@ std::unordered_map<
     {"i32", ecs::FieldType::Int32}
 };
 
-Loader::Loader(const std::string& project_path): project_path(project_path) {}
+Loader::Loader(std::string_view project_path): project_path(project_path) {}
 
 std::expected<std::vector<ComponentDefinition>, LoaderError> 
-Loader::readComponentFile(const std::string& file_path)
+Loader::readComponentFile(std::string_view file_path)
 {
     std::vector<ComponentDefinition> definitions;
-    std::string component_file_path (this->project_path + file_path);
+    std::string component_file_path (this->project_path + file_path.data());
     toml::table tbl;
     try
     {
