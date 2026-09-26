@@ -4,7 +4,6 @@ project(ecs)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(ECS_SOURCES
@@ -14,10 +13,11 @@ set(ECS_SOURCES
     src/archetype.cpp
 )
 
-set(IDE_SOURCES
-    src/loader.cpp
-    src/system_runtime.cpp
+set(APP_SOURCES
+    src/window.cpp
+    src/tools.cpp
     src/game.cpp
+    src/system_runtime.cpp
 )
 
 include(FetchContent)
@@ -34,7 +34,6 @@ FetchContent_Declare(
     GIT_TAG release-3.4.16
 )
 FetchContent_MakeAvailable(sdl3)
-
 
 include(ExternalProject)
 set(LUABRIDGE3_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/luabridge3-src")
@@ -89,7 +88,6 @@ endif()
 
 add_library(LuaBridge3 INTERFACE)
 add_library(LuaBridge3::LuaBridge ALIAS LuaBridge3)
-
 add_dependencies(LuaBridge3 luabridge3_external)
 
 target_include_directories(LuaBridge3
@@ -104,21 +102,20 @@ option(BUILD_TESTS "Build Tests (Requires Catch2)" OFF)
 add_executable(${PROJECT_NAME})
 add_dependencies(${PROJECT_NAME} imgui_external)
 
-target_sources(${PROJECT_NAME} PRIVATE 
+target_sources(${PROJECT_NAME} PRIVATE
     ${ECS_SOURCES}
-    ${IDE_SOURCES}
+    ${APP_SOURCES}
     ${IMGUI_SOURCES}
     src/main.cpp
-) 
+)
 target_include_directories(${PROJECT_NAME} PRIVATE
     src/
     ${SDL3_SOURCE_DIR}/include
     ${IMGUI_SOURCE_DIR}
     ${IMGUI_SOURCE_DIR}/backends
 )
-target_link_libraries(${PROJECT_NAME} PRIVATE 
+target_link_libraries(${PROJECT_NAME} PRIVATE
     Lua::Lua
-    Catch2::Catch2WithMain
     tomlplusplus::tomlplusplus
     LuaBridge3::LuaBridge
     SDL3::SDL3
@@ -132,11 +129,11 @@ if(BUILD_TESTS)
         ${ECS_SOURCES}
         tests/entity_component_test.cpp
     )
-    target_include_directories(entity_component_test PRIVATE 
+    target_include_directories(entity_component_test PRIVATE
         src/
         ${SDL3_SOURCE_DIR}/include
     )
-    target_link_libraries(entity_component_test PRIVATE 
+    target_link_libraries(entity_component_test PRIVATE
         tomlplusplus::tomlplusplus
         Catch2::Catch2WithMain
     )
@@ -145,16 +142,16 @@ if(BUILD_TESTS)
     target_sources(toml_lua_test PRIVATE
         ${IMGUI_SOURCES}
         ${ECS_SOURCES}
-        ${IDE_SOURCES}
+        ${APP_SOURCES}
         tests/toml_lua_test.cpp
     )
-    target_include_directories(toml_lua_test PRIVATE 
+    target_include_directories(toml_lua_test PRIVATE
         src/
         ${SDL3_SOURCE_DIR}/include
         ${IMGUI_SOURCE_DIR}
         ${IMGUI_SOURCE_DIR}/backends
-    ) 
-    target_link_libraries(toml_lua_test PRIVATE 
+    )
+    target_link_libraries(toml_lua_test PRIVATE
         Lua::Lua
         Catch2::Catch2WithMain
         tomlplusplus::tomlplusplus
@@ -162,25 +159,7 @@ if(BUILD_TESTS)
         SDL3::SDL3
     )
 
-    add_custom_command(
-        TARGET toml_lua_test PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_SOURCE_DIR}/tests/valid.toml
-                ${CMAKE_CURRENT_BINARY_DIR}/valid.toml)
-
-    add_custom_command(
-        TARGET toml_lua_test PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_SOURCE_DIR}/tests/valid.lua
-                ${CMAKE_CURRENT_BINARY_DIR}/valid.lua)
-
     include(CTest)
     include(Catch)
-    catch_discover_tests(
-        entity_component_test
-        toml_lua_test
-    )
-
-endif(BUILD_TESTS)
-
-
+    catch_discover_tests(entity_component_test toml_lua_test)
+endif()

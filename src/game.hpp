@@ -1,39 +1,42 @@
 #pragma once
 
-#include "imgui.h"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_sdlgpu3.h"
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_main.h"
-
 #include "system_runtime.hpp"
 #include "world.hpp"
 
+#include <expected>
+#include <string>
+#include <string_view>
+
+#include "window.hpp"
+#include "tools.hpp"
+
+namespace game {
+
+enum class GameError {
+    ComponentLoadFailed,
+    SystemLoadFailed,
+    ToolsInitFailed,
+    WindowInitFailed,
+};
+
 class Game {
-    private:
-    ecs::World world;
-    ecs::lua::SystemRuntime systems;
-
-    SDL_Window *window = nullptr;
-    SDL_Renderer *renderer = nullptr;
-    SDL_GPUDevice* gpu_device = nullptr;
-
-    ImGuiIO* io;
-
-    std::string component_file;
-    std::string systems_file;
-
-    bool is_running;
-
-    public:
+public:
     Game();
 
-    int setup(const std::string& component_file, const std::string& systems_file);
-    int start();
-    int input(SDL_Event *event, double delta_time);
-    int update(double delta_time);
-    int stop();
-    int quit();
+    [[nodiscard]] std::expected<void, GameError> setup(std::string_view component_file, std::string_view systems_file);
+    [[nodiscard]] int start() noexcept;
+    [[nodiscard]] int input(SDL_Event* event, double delta_time);
+    [[nodiscard]] int update(double delta_time);
+    [[nodiscard]] int stop() noexcept;
+    [[nodiscard]] int quit() noexcept;
+    [[nodiscard]] bool isRunning() const noexcept;
 
-    bool isRunning();
+private:
+    ecs::World world;
+    ecs::lua::SystemRuntime systems;
+    app::WindowManager window;
+    app::ToolsManager tools;
+    bool is_running{false};
 };
+
+} // namespace game

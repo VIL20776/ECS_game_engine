@@ -5,37 +5,47 @@
 
 #include "game.hpp"
 
+namespace {
 
-Game game;
+constexpr std::string_view kDefaultComponentFile = "./components.toml";
+constexpr std::string_view kDefaultSystemsFile = "./systems.lua";
 
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) 
-{
-    game.setup("./components.toml", "./systems.lua");
+} // namespace
 
+game::Game game;
+
+SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
+    (void)appstate;
+    (void)argc;
+    (void)argv;
+    if (const auto result = game.setup(kDefaultComponentFile, kDefaultSystemsFile); !result.has_value()) {
+        return SDL_APP_FAILURE;
+    }
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) 
-{
-    if (event->type == SDL_EVENT_QUIT)
-        return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
-
-    double dt = ((double)SDL_GetTicks()) / 1000.0;
-    game.input(event, dt);
-
+SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
+    (void)appstate;
+    if (event == nullptr) {
+        return SDL_APP_CONTINUE;
+    }
+    if (event->type == SDL_EVENT_QUIT) {
+        return SDL_APP_SUCCESS;
+    }
+    game.input(event, 0.0);
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate) 
-{
-    double dt = ((double)SDL_GetTicks()) / 1000.0;
-    if (game.isRunning())
-        game.update(dt);
-
+SDL_AppResult SDL_AppIterate(void* appstate) {
+    (void)appstate;
+    if (game.isRunning()) {
+        game.update(0.0);
+    }
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result) 
-{
+void SDL_AppQuit(void* appstate, SDL_AppResult result) {
+    (void)appstate;
+    (void)result;
     game.quit();
 }
