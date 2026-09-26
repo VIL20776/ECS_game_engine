@@ -5,6 +5,7 @@
 #include "entity.hpp"
 
 #include <cstddef>
+#include <expected>
 #include <memory>
 #include <span>
 #include <string>
@@ -14,6 +15,12 @@
 
 namespace ecs {
 
+enum class LoaderError { parse_error, field_type_error };
+
+struct ComponentDefinition {
+    std::string name;
+    std::vector<ecs::ComponentField> fields;
+};
 
 class World {
 public:
@@ -49,6 +56,9 @@ public:
 
     // Returns every archetype whose signature is a superset of component_ids.
     std::vector<Archetype*> query(std::span<const ComponentId> component_ids);
+
+    std::expected<std::vector<ComponentDefinition>, LoaderError> 
+    readComponentFile(std::string_view file_path);
 
     ComponentSchema& getComponentSchema(ComponentId component_id);
     ComponentSchema& getComponentSchema(const std::string& component_name);

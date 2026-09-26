@@ -1,6 +1,5 @@
 #include "system_runtime.hpp"
 #include "component.hpp"
-#include <print>
 
 extern "C" {
 #include <lua.h>
@@ -13,6 +12,7 @@ extern "C" {
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <print>
 #include <stdexcept>
 #include <string>
 

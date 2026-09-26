@@ -17,6 +17,7 @@ set(ECS_SOURCES
 set(IDE_SOURCES
     src/loader.cpp
     src/system_runtime.cpp
+    src/game.cpp
 )
 
 include(FetchContent)
@@ -34,8 +35,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sdl3)
 
-set(LUABRIDGE3_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/luabridge3-src")
+
 include(ExternalProject)
+set(LUABRIDGE3_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/luabridge3-src")
 ExternalProject_Add(luabridge3_external
     GIT_REPOSITORY "https://github.com/kunitoki/LuaBridge3.git"
     GIT_TAG "3.0-rc12"
@@ -48,6 +50,29 @@ ExternalProject_Add(luabridge3_external
     INSTALL_COMMAND ""
     TEST_COMMAND ""
     UPDATE_DISCONNECTED TRUE
+)
+
+set(IMGUI_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/imgui-src")
+ExternalProject_Add(imgui_external
+    GIT_REPOSITORY "https://github.com/ocornut/imgui.git"
+    GIT_TAG "v1.92.9b"
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    SOURCE_DIR "${IMGUI_SOURCE_DIR}"
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    TEST_COMMAND ""
+    UPDATE_DISCONNECTED TRUE
+)
+
+file(GLOB IMGUI_SOURCES
+    ${IMGUI_SOURCE_DIR}/*.cpp
+    ${IMGUI_SOURCE_DIR}/*.hpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_sdl3.hpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_sdlgpu3.cpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_sdlgpu3.hpp
 )
 
 find_package(Lua 5.4 REQUIRED)
@@ -77,9 +102,20 @@ target_link_libraries(LuaBridge3 INTERFACE Lua::Lua)
 option(BUILD_TESTS "Build Tests (Requires Catch2)" OFF)
 
 add_executable(${PROJECT_NAME})
+add_dependencies(${PROJECT_NAME} imgui_external)
+
 target_sources(${PROJECT_NAME} PRIVATE 
+    ${ECS_SOURCES}
+    ${IDE_SOURCES}
+    ${IMGUI_SOURCES}
     src/main.cpp
 ) 
+target_include_directories(${PROJECT_NAME} PRIVATE
+    src/
+    ${SDL3_SOURCE_DIR}/include
+    ${IMGUI_SOURCE_DIR}
+    ${IMGUI_SOURCE_DIR}/backends
+)
 target_link_libraries(${PROJECT_NAME} PRIVATE 
     Lua::Lua
     Catch2::Catch2WithMain
@@ -96,23 +132,34 @@ if(BUILD_TESTS)
         ${ECS_SOURCES}
         tests/entity_component_test.cpp
     )
-    target_include_directories(entity_component_test PRIVATE src/)
+    target_include_directories(entity_component_test PRIVATE 
+        src/
+        ${SDL3_SOURCE_DIR}/include
+    )
     target_link_libraries(entity_component_test PRIVATE 
+        tomlplusplus::tomlplusplus
         Catch2::Catch2WithMain
     )
 
     add_executable(toml_lua_test)
     target_sources(toml_lua_test PRIVATE
+        ${IMGUI_SOURCES}
         ${ECS_SOURCES}
         ${IDE_SOURCES}
         tests/toml_lua_test.cpp
     )
-    target_include_directories(toml_lua_test PRIVATE src/) 
+    target_include_directories(toml_lua_test PRIVATE 
+        src/
+        ${SDL3_SOURCE_DIR}/include
+        ${IMGUI_SOURCE_DIR}
+        ${IMGUI_SOURCE_DIR}/backends
+    ) 
     target_link_libraries(toml_lua_test PRIVATE 
         Lua::Lua
         Catch2::Catch2WithMain
         tomlplusplus::tomlplusplus
         LuaBridge3::LuaBridge
+        SDL3::SDL3
     )
 
     add_custom_command(
