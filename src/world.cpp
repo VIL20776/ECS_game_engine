@@ -20,48 +20,50 @@
 
 namespace ecs {
 
-std::unordered_map<
-    std::string, 
-    FieldType
-> type_map {
-    {"f32", FieldType::Float32},
-    {"i32", FieldType::Int32}
+namespace {
+
+constexpr std::string_view kTypeNameFloat = "f32";
+constexpr std::string_view kTypeNameInt = "i32";
+
+const std::unordered_map<std::string, FieldType> type_map = {
+    {std::string{kTypeNameFloat}, FieldType::Float32},
+    {std::string{kTypeNameInt}, FieldType::Int32},
 };
 
-World::World() {}
+} // namespace
 
-ComponentId World::createComponent(std::string_view name, const std::vector<ComponentField>& fields) 
+World::World() = default;
+
+std::expected<ComponentId, ComponentCreateError> World::createComponent(
+    std::string_view name,
+    const std::vector<ComponentField>& fields)
 {
     ComponentSchema schema;
-
-    if (schema.id == InvalidComponentId) {
-        schema.id = next_component_id++;
-    } else {
-        next_component_id = std::max(next_component_id, schema.id + 1);
-    }
-
-    schema.name = name;
+    schema.id = next_component_id++;
+    schema.name = std::string{name};
     schema.fields = fields;
 
     std::size_t offset = 0;
-    for (auto& field: schema.fields) {
+    for (auto& field : schema.fields) {
         field.size = fieldTypeSize(field.type);
         field.offset = offset;
         offset += field.size;
     }
-
-    schema.size = offset; 
+    schema.size = offset;
 
     if (!schema.validate()) {
-        throw std::invalid_argument("invalid component schema");
+        return std::unexpected(ComponentCreateError::InvalidSchema);
     }
     if (component_schemas.contains(schema.id)) {
-        throw std::invalid_argument("component ID is already registered");
+        return std::unexpected(ComponentCreateError::DuplicateComponent);
     }
 
     const ComponentId component_id = schema.id;
     auto [item, inserted] = component_schemas.emplace(component_id, std::move(schema));
-    component_schema_map.emplace(name, item->second);
+    if (!inserted) {
+        return std::unexpected(ComponentCreateError::DuplicateComponent);
+    }
+    component_schema_map.emplace(std::string{name}, item->second);
     return component_id;
 }
 
@@ -81,7 +83,7 @@ void World::deleteComponent(ComponentId component_id) {
     removeUnusedArchetypes();
 }
 
-EntityId World::createEntity() { 
+EntityId World::createEntity() {
     Archetype& archetype = getOrCreateArchetype({});
     const EntityId entity_id = next_entity_id++;
     const std::size_t row = archetype.appendEntity(entity_id);
@@ -89,12 +91,12 @@ EntityId World::createEntity() {
     return entity_id;
 }
 
-void World::deleteEntity(EntityId entity_id) 
-{
+void World::deleteEntity(EntityId entity_id) {
     const auto record_it = entity_records.find(entity_id);
-    if (record_it == entity_records.end()) 
+    if (record_it == entity_records.end()) {
         return;
-    
+    }
+
     Archetype& archetype = *record_it->second.archetype;
     const std::size_t removed_row = record_it->second.row;
     const std::size_t last_row = archetype.getEntities().size() - 1;
@@ -103,13 +105,14 @@ void World::deleteEntity(EntityId entity_id)
     archetype.removeEntity(entity_id);
     entity_records.erase(record_it);
 
-    if (removed_row != last_row) 
-        entity_records.at(moved_entity_id).row = removed_row; 
+    if (removed_row != last_row) {
+        entity_records.at(moved_entity_id).row = removed_row;
+    }
 }
 
 void World::addComponent(EntityId entity_id, ComponentId component_id, const std::vector<std::byte>& data) {
     migrateEntity(entity_id, component_id);
-    EntityRecord record = entity_records.at(entity_id);
+    const auto record = entity_records.at(entity_id);
     record.archetype->setRawComponent(entity_id, component_id, data);
 }
 
@@ -117,10 +120,7 @@ void World::removeComponent(EntityId entity_id, ComponentId component_id) {
     migrateEntity(entity_id, component_id);
 }
 
-// Returns every archetype whose signature is a superset of component_ids.
-std::vector<Archetype*> 
-World::query(std::span<const ComponentId> component_ids) 
-{
+std::vector<Archetype*> World::query(std::span<const ComponentId> component_ids) {
     std::vector<ComponentId> required{component_ids.begin(), component_ids.end()};
     normalizeSignature(required);
     validateSignature(required);
@@ -136,62 +136,61 @@ World::query(std::span<const ComponentId> component_ids)
     return result;
 }
 
-std::expected<std::vector<ComponentDefinition>, LoaderError> 
-World::readComponentFile(std::string_view file_path)
+std::expected<std::vector<ComponentDefinition>, ComponentLoadError> World::loadComponents(
+    std::string_view file_path)
 {
     std::vector<ComponentDefinition> definitions;
-    std::string component_file_path (file_path.data());
+    std::string component_file_path{file_path};
     toml::table tbl;
-    try
-    {
+
+    try {
         tbl = toml::parse_file(component_file_path);
-        std::cout << tbl << "\n";
-    }
-    catch (const toml::parse_error& err)
-    {
-        std::cerr << "Parsing failed:\n" << err << "\n";
-        return std::unexpected(LoaderError::parse_error);
+    } catch (const toml::parse_error&) {
+        return std::unexpected(ComponentLoadError::ParseError);
     }
 
-    for (auto& item: tbl) {
-        ComponentDefinition def;
-        std::string name (item.first.str());
-        def.name = name;
-        for ( auto& field: *(item.second.as_table()) ) {
-            std::string field_name (field.first.str());
-            std::string field_type (field.second.value<std::string>().value());
-            if (!type_map.contains(field_type)) {
-                std::println(stderr, "Value '{:s}' for field '{:s}' is not a valid type", field_type.c_str(), field_name.c_str());
-                return std::unexpected(LoaderError::field_type_error);
-            }
-            def.fields.emplace_back(field_name, type_map.at(field_type));
+    for (auto& item : tbl) {
+        ComponentDefinition definition;
+        definition.name = item.first.str();
+
+        auto* table = item.second.as_table();
+        if (table == nullptr) {
+            return std::unexpected(ComponentLoadError::InvalidDefinition);
         }
-        definitions.push_back(def);
+
+        for (auto& field : *table) {
+            const std::string field_name{field.first.str()};
+            const auto field_value = field.second.value<std::string>();
+            if (!field_value) {
+                return std::unexpected(ComponentLoadError::InvalidDefinition);
+            }
+            const std::string field_type = *field_value;
+            const auto it = type_map.find(field_type);
+            if (it == type_map.end()) {
+                return std::unexpected(ComponentLoadError::FieldTypeError);
+            }
+            definition.fields.emplace_back(field_name, it->second);
+        }
+
+        definitions.push_back(definition);
     }
 
     return definitions;
 }
 
-ComponentSchema&
-World::getComponentSchema(ComponentId component_id) { return component_schemas.at(component_id); }
+ComponentSchema& World::getComponentSchema(ComponentId component_id) { return component_schemas.at(component_id); }
 
-ComponentSchema&
-World::getComponentSchema(const std::string& component_name) { return component_schema_map.at(component_name); }
+ComponentSchema& World::getComponentSchema(const std::string& component_name) { return component_schema_map.at(component_name); }
 
-const EntityRecord&
-World::getEntityRecord(EntityId entity_id) { return entity_records.at(entity_id); }
+const EntityRecord& World::getEntityRecord(EntityId entity_id) { return entity_records.at(entity_id); }
 
-std::size_t
-World::getEntityCount() { return entity_records.size(); }
+std::size_t World::getEntityCount() { return entity_records.size(); }
 
-std::size_t
-World::getComponentCount() { return component_schemas.size(); }
+std::size_t World::getComponentCount() { return component_schemas.size(); }
 
-std::size_t
-World::getArchetypeCount() { return archetypes.size(); }
+std::size_t World::getArchetypeCount() { return archetypes.size(); }
 
-void World::migrateEntity(EntityId entity_id, ComponentId component_id) 
-{
+void World::migrateEntity(EntityId entity_id, ComponentId component_id) {
     const auto record_it = entity_records.find(entity_id);
     if (record_it == entity_records.end()) {
         throw std::out_of_range("unknown entity");
@@ -203,19 +202,16 @@ void World::migrateEntity(EntityId entity_id, ComponentId component_id)
     Archetype* source = record_it->second.archetype;
     Archetype* target = nullptr;
 
-    std::vector<ComponentId> target_signature {
+    std::vector<ComponentId> target_signature{
         source->getComponentIds().begin(),
-        source->getComponentIds().end()
-    };
+        source->getComponentIds().end()};
 
     if (source->component_edge.contains(component_id)) {
         auto& edge = source->component_edge.at(component_id);
-        target = (edge.add != nullptr) ? edge.add: edge.remove;
+        target = (edge.add != nullptr) ? edge.add : edge.remove;
     } else {
-        const auto component_it = std::lower_bound(
-                target_signature.begin(), target_signature.end(), component_id);
-        const bool has_component =
-            component_it != target_signature.end() && *component_it == component_id;
+        const auto component_it = std::lower_bound(target_signature.begin(), target_signature.end(), component_id);
+        const bool has_component = component_it != target_signature.end() && *component_it == component_id;
 
         if (has_component) {
             target_signature.erase(component_it);
@@ -236,8 +232,6 @@ void World::migrateEntity(EntityId entity_id, ComponentId component_id)
 
     const std::size_t target_row = target->appendEntity(entity_id);
 
-    // Copy every component shared by both archetypes. Components newly
-    // introduced in target keep appendEntity()'s zero initialization.
     for (ComponentId shared_component_id : target_signature) {
         if (!source->hasComponent(shared_component_id)) {
             continue;
@@ -260,14 +254,12 @@ void World::migrateEntity(EntityId entity_id, ComponentId component_id)
     }
 }
 
-void World::normalizeSignature(std::vector<ComponentId>& signature) 
-{
+void World::normalizeSignature(std::vector<ComponentId>& signature) {
     std::sort(signature.begin(), signature.end());
     signature.erase(std::unique(signature.begin(), signature.end()), signature.end());
 }
 
-void World::validateSignature(std::span<const ComponentId> signature) 
-{
+void World::validateSignature(std::span<const ComponentId> signature) {
     for (ComponentId component_id : signature) {
         if (!component_schemas.contains(component_id)) {
             throw std::invalid_argument("entity/archetype references an unknown component");
@@ -275,31 +267,26 @@ void World::validateSignature(std::span<const ComponentId> signature)
     }
 }
 
-Archetype* World::findArchetype(const Signature& signature) 
-{
+Archetype* World::findArchetype(const Signature& signature) {
     const auto& archetype_it = archetypes.find(signature);
-    if (archetype_it != archetypes.end())
+    if (archetype_it != archetypes.end()) {
         return archetype_it->second.get();
-
+    }
     return nullptr;
 }
 
-Archetype& World::getOrCreateArchetype(const std::vector<ComponentId>& signature)
-{
+Archetype& World::getOrCreateArchetype(const std::vector<ComponentId>& signature) {
     if (Archetype* existing = findArchetype(signature)) {
         return *existing;
     }
 
-    // const ArchetypeId archetype_id = next_archetype_id++;
-    auto archetype_ptr = std::unique_ptr<Archetype>(
-        new Archetype(signature, component_schemas));
+    auto archetype_ptr = std::unique_ptr<Archetype>(new Archetype(signature, component_schemas));
     Archetype& archetype = *archetype_ptr;
     archetypes.emplace(signature, std::move(archetype_ptr));
     return archetype;
 }
 
-void World::removeUnusedArchetypes()
-{
+void World::removeUnusedArchetypes() {
     for (auto it = archetypes.begin(); it != archetypes.end();) {
         if (it->second->getEntities().empty()) {
             it = archetypes.erase(it);
@@ -310,3 +297,4 @@ void World::removeUnusedArchetypes()
 }
 
 } // namespace ecs
+
