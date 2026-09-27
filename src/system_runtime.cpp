@@ -13,14 +13,15 @@ extern "C" {
 #include <cstddef>
 #include <cstring>
 #include <print>
-#include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace ecs::lua {
 namespace {
 
 template <typename T>
-T readValue(std::span<const std::byte> data, std::size_t offset) {
+[[nodiscard]] T readValue(std::span<const std::byte> data, std::size_t offset) {
     if (offset > data.size() || sizeof(T) > data.size() - offset) {
         throw std::out_of_range("component read is outside the raw data range");
     }
@@ -71,34 +72,34 @@ void ComponentView::checkRange(std::size_t offset, std::size_t size) const {
     }
 }
 
-std::int64_t ComponentView::readInt(std::string field_name) const {
+std::int64_t ComponentView::readInt(std::string_view field_name) const {
     auto* field = schema_->findField(field_name);
     return readValue<std::int32_t>(raw(), field->offset);
 }
 
-double ComponentView::readFloat(std::string field_name) const {
+double ComponentView::readFloat(std::string_view field_name) const {
     std::println("Reading float");
     auto* field = schema_->findField(field_name);
     return static_cast<double>(readValue<float>(raw(), field->offset));
 }
 
-bool ComponentView::readBool(std::string field_name) const {
+bool ComponentView::readBool(std::string_view field_name) const {
     auto* field = schema_->findField(field_name);
     return readValue<std::uint8_t>(raw(), field->offset) != 0;
 }
 
-void ComponentView::writeInt(std::string field_name, int value) {
+void ComponentView::writeInt(std::string_view field_name, int value) {
     auto* field = schema_->findField(field_name);
     writeValue(raw(), field->offset, static_cast<std::int32_t>(value));
 }
 
-void ComponentView::writeFloat(std::string field_name, double value) {
+void ComponentView::writeFloat(std::string_view field_name, double value) {
     std::println("writing float");
     auto* field = schema_->findField(field_name);
     writeValue(raw(), field->offset, static_cast<float>(value));
 }
 
-void ComponentView::writeBool(std::string field_name, bool value) {
+void ComponentView::writeBool(std::string_view field_name, bool value) {
     auto* field = schema_->findField(field_name);
     writeValue(raw(), field->offset, static_cast<std::uint8_t>(value ? 1 : 0));
 }
@@ -112,7 +113,6 @@ SystemRuntime::SystemRuntime(World& world) : world_(world), lua_state_(luaL_news
 }
 
 SystemRuntime::~SystemRuntime() {
-    // LuaRef objects must be released before their lua_State is closed.
     systems_.clear();
     if (lua_state_ != nullptr) {
         lua_close(lua_state_);
@@ -138,9 +138,9 @@ void SystemRuntime::registerBindings() {
         .endNamespace();
 }
 
-std::vector<ComponentId> SystemRuntime::readQuery(const luabridge::LuaRef& query) const {
+std::expected<std::vector<ComponentId>, LuaRuntimeError> SystemRuntime::readQuery(const luabridge::LuaRef& query) const {
     if (!query.isTable()) {
-        throw std::invalid_argument("ecs.system query must be a Lua table");
+        return std::unexpected(LuaRuntimeError::QueryInvalid);
     }
 
     std::vector<ComponentId> result;
@@ -153,15 +153,14 @@ std::vector<ComponentId> SystemRuntime::readQuery(const luabridge::LuaRef& query
         lua_rawgeti(lua_state_, table_index, index);
         if (!lua_isstring(lua_state_, -1)) {
             lua_pop(lua_state_, 2);
-            throw std::invalid_argument("ecs.system query entries must be integer ComponentId values");
+            return std::unexpected(LuaRuntimeError::QueryInvalid);
         }
 
         const auto name = lua_tostring(lua_state_, -1);
-        //  std::println("{}", name);
         lua_pop(lua_state_, 1);
         if (name == nullptr) {
             lua_pop(lua_state_, 1);
-            throw std::invalid_argument("Component name cannot be empty");
+            return std::unexpected(LuaRuntimeError::QueryInvalid);
         }
         result.push_back(static_cast<ComponentId>(world_.getComponentSchema(name).id));
     }
@@ -172,41 +171,47 @@ std::vector<ComponentId> SystemRuntime::readQuery(const luabridge::LuaRef& query
     return result;
 }
 
-void SystemRuntime::registerSystem(
+std::expected<void, LuaRuntimeError> SystemRuntime::registerSystem(
     const std::string& name,
     const luabridge::LuaRef& query,
     const luabridge::LuaRef& update) {
     if (name.empty()) {
-        throw std::invalid_argument("system name cannot be empty");
+        return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
     if (!update.isFunction()) {
-        throw std::invalid_argument("ecs.system update must be a Lua function");
+        return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
     if (std::any_of(systems_.begin(), systems_.end(), [&](const System& system) { return system.name == name; })) {
-        throw std::invalid_argument("a system named '" + name + "' is already registered");
+        return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
 
-    systems_.push_back(System{name, readQuery(query), update});
+    const auto query_result = readQuery(query);
+    if (!query_result.has_value()) {
+        return std::unexpected(query_result.error());
+    }
+    systems_.push_back(System{name, query_result.value(), update});
+    return {};
 }
 
-void SystemRuntime::loadFile(const std::string& file_name) {
-    if (luaL_loadfile(lua_state_, file_name.c_str()) != LUA_OK) {
+std::expected<void, LuaRuntimeError> SystemRuntime::loadFile(std::string_view file_name) {
+    std::string filename{file_name};
+    if (luaL_loadfile(lua_state_, filename.c_str()) != LUA_OK) {
         const std::string message = lua_tostring(lua_state_, -1);
         lua_pop(lua_state_, 1);
-        throw std::runtime_error("could not load Lua file '" + file_name + "': " + message);
+        return std::unexpected(LuaRuntimeError::SystemLoadFailed);
     }
     if (lua_pcall(lua_state_, 0, 0, 0) != LUA_OK) {
         const std::string message = lua_tostring(lua_state_, -1);
         lua_pop(lua_state_, 1);
-        throw std::runtime_error("error executing Lua file '" + file_name + "': " + message);
+        return std::unexpected(LuaRuntimeError::SystemLoadFailed);
     }
+    return {};
 }
 
 luabridge::LuaRef SystemRuntime::makeComponentTable(
     Archetype& archetype,
     EntityId entity_id,
-    const System& system) 
-{
+    const System& system) {
     auto components = luabridge::newTable(lua_state_);
     for (ComponentId component_id : system.query) {
         auto& schema = world_.getComponentSchema(component_id);
@@ -215,11 +220,10 @@ luabridge::LuaRef SystemRuntime::makeComponentTable(
     return components;
 }
 
-void SystemRuntime::update(double delta_time) {
+std::expected<void, LuaRuntimeError> SystemRuntime::update(double delta_time) {
     for (const System& system : systems_) {
         const auto archetypes = world_.query(system.query);
         for (Archetype* archetype : archetypes) {
-            // Copy IDs because Lua code may indirectly cause structural ECS changes later.
             const auto entity_span = archetype->getEntities();
             const std::vector<EntityId> entities(entity_span.begin(), entity_span.end());
 
@@ -227,12 +231,12 @@ void SystemRuntime::update(double delta_time) {
                 auto components = makeComponentTable(*archetype, entity_id, system);
                 auto result = system.update(entity_id, components, delta_time);
                 if (!result) {
-                    throw std::runtime_error(
-                        "Lua system '" + system.name + "' failed: " + result.message());
+                    return std::unexpected(LuaRuntimeError::SystemExecutionFailed);
                 }
             }
         }
     }
+    return {};
 }
 
 } // namespace ecs::lua
