@@ -32,8 +32,6 @@ const std::unordered_map<std::string, FieldType> type_map = {
 
 } // namespace
 
-World::World() = default;
-
 std::expected<ComponentId, ComponentCreateError> World::createComponent(
     std::string_view name,
     const std::vector<ComponentField>& fields)

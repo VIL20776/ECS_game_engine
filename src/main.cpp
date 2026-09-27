@@ -12,13 +12,13 @@ constexpr std::string_view kDefaultSystemsFile = "./systems.lua";
 
 } // namespace
 
-game::Game game;
+game::Game ctx;
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     (void)appstate;
     (void)argc;
     (void)argv;
-    if (const auto result = game.setup(kDefaultComponentFile, kDefaultSystemsFile); !result.has_value()) {
+    if (const auto result = ctx.setup(kDefaultComponentFile, kDefaultSystemsFile); !result.has_value()) {
         return SDL_APP_FAILURE;
     }
     return SDL_APP_CONTINUE;
@@ -32,14 +32,14 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;
     }
-    game.input(event, 0.0);
+    ctx.input(event, 0.0);
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppIterate(void* appstate) {
     (void)appstate;
-    if (game.isRunning()) {
-        game.update(0.0);
+    if (ctx.isRunning()) {
+        ctx.update(0.0);
     }
     return SDL_APP_CONTINUE;
 }
@@ -47,5 +47,5 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
     (void)appstate;
     (void)result;
-    game.quit();
+    ctx.quit();
 }

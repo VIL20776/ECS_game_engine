@@ -3,6 +3,14 @@
 #include "component.hpp"
 #include "world.hpp"
 
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+}
+
+#include <LuaBridge/LuaBridge.h>
+
 #include <cstddef>
 #include <expected>
 #include <string>
