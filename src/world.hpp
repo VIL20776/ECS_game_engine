@@ -64,9 +64,12 @@ public:
 
     [[nodiscard]] const EntityRecord& getEntityRecord(EntityId entity_id);
 
-    [[nodiscard]] std::size_t getEntityCount();
-    [[nodiscard]] std::size_t getComponentCount();
-    [[nodiscard]] std::size_t getArchetypeCount();
+    // Returns all entity IDs currently in the world
+    [[nodiscard]] std::vector<EntityId> getAllEntityIds() const;
+
+    [[nodiscard]] std::size_t getEntityCount() const;
+    [[nodiscard]] std::size_t getComponentCount() const;
+    [[nodiscard]] std::size_t getArchetypeCount() const;
 
 private:
     void migrateEntity(EntityId entity_id, ComponentId component_id);

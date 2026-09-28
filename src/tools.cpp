@@ -43,24 +43,51 @@ void ToolsManager::newFrame() noexcept {
     ImGui::NewFrame();
 }
 
-void ToolsManager::entityViewerTool(ecs::World *ctx) noexcept {
+void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
+    if (!initialized_ || ctx == nullptr) {
+        return;
+    }
+
     ImGui::Begin("Entity Viewer");
 
-    for (ecs::EntityId eid = 0; eid < ctx->getEntityCount(); eid++) {
-        auto& record = ctx->getEntityRecord(eid);
+    const auto entity_ids = ctx->getAllEntityIds();
+    if (entity_ids.empty()) {
+        ImGui::Text("No entities in the world");
+    } else {
+        ImGui::Text("Total entities: %zu", entity_ids.size());
+        ImGui::Separator();
 
-        std::string entity_label = std::format("Entity %d", eid);
-        if (ImGui::TreeNode(entity_label.c_str())) {
+        for (const auto eid : entity_ids) {
+            try {
+                const auto& record = ctx->getEntityRecord(eid);
+                const std::string entity_label = std::format("Entity {}", eid);
 
-            for (auto cid: record.archetype->getComponentIds()) {
-                std::string component_name = ctx->getComponentSchema(cid).name;
-                ImGui::Text(component_name.c_str());
+                if (ImGui::TreeNode(entity_label.c_str())) {
+                    const auto component_ids = record.archetype->getComponentIds();
+                    if (component_ids.empty()) {
+                        ImGui::Text("  (no components)");
+                    } else {
+                        for (const auto cid : component_ids) {
+                            try {
+                                const auto& schema = ctx->getComponentSchema(cid);
+                                ImGui::Bullet();
+                                ImGui::Text("%s (id: %llu, size: %zu bytes)",
+                                    schema.name.c_str(),
+                                    cid,
+                                    schema.size);
+                            } catch (...) {
+                                ImGui::Text("  <error reading component>");
+                            }
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+            } catch (...) {
+                ImGui::Text("Error reading entity %llu", eid);
             }
-
-            ImGui::TreePop();
         }
     }
-    
+
     ImGui::End();
 }
 

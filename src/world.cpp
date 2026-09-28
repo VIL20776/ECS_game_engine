@@ -32,8 +32,9 @@ const std::unordered_map<std::string, FieldType> type_map = {
 
 } // namespace
 
-std::expected<ComponentId, ComponentCreateError> 
-World::createComponent(
+World::World() = default;
+
+std::expected<ComponentId, ComponentCreateError> World::createComponent(
     std::string_view name,
     const std::vector<ComponentField>& fields)
 {
@@ -53,7 +54,7 @@ World::createComponent(
     if (!schema.validate()) {
         return std::unexpected(ComponentCreateError::InvalidSchema);
     }
-    if (component_schema_map.contains(schema.name)) {
+    if (component_schemas.contains(schema.id)) {
         return std::unexpected(ComponentCreateError::DuplicateComponent);
     }
 
@@ -183,11 +184,22 @@ ComponentSchema& World::getComponentSchema(const std::string& component_name) { 
 
 const EntityRecord& World::getEntityRecord(EntityId entity_id) { return entity_records.at(entity_id); }
 
-std::size_t World::getEntityCount() { return entity_records.size(); }
+std::vector<EntityId> World::getAllEntityIds() const {
+    std::vector<EntityId> entity_ids;
+    entity_ids.reserve(entity_records.size());
+    for (const auto& [entity_id, record] : entity_records) {
+        (void)record;
+        entity_ids.push_back(entity_id);
+    }
+    std::sort(entity_ids.begin(), entity_ids.end());
+    return entity_ids;
+}
 
-std::size_t World::getComponentCount() { return component_schemas.size(); }
+std::size_t World::getEntityCount() const { return entity_records.size(); }
 
-std::size_t World::getArchetypeCount() { return archetypes.size(); }
+std::size_t World::getComponentCount() const { return component_schemas.size(); }
+
+std::size_t World::getArchetypeCount() const { return archetypes.size(); }
 
 void World::migrateEntity(EntityId entity_id, ComponentId component_id) {
     const auto record_it = entity_records.find(entity_id);
@@ -296,4 +308,3 @@ void World::removeUnusedArchetypes() {
 }
 
 } // namespace ecs
-
