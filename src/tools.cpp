@@ -47,7 +47,9 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
     if (!initialized_ || ctx == nullptr) {
         return;
     }
-
+    ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(420.0f, 360.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
     ImGui::Begin("Entity Viewer");
 
     const auto entity_ids = ctx->getAllEntityIds();
