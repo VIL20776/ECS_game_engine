@@ -62,13 +62,49 @@ int Game::input(SDL_Event* event, double delta_time) {
 
 int Game::update(double delta_time) {
     tools.newFrame();
-
-    ImGui::ShowDemoWindow();
-    systems.update(delta_time);
-
     tools.entityViewerTool(&world);
 
-    ImGui::Render();
+    const auto update_result = systems.update(delta_time);
+    if (!update_result.has_value()) {
+        return SDL_APP_FAILURE;
+    }
+
+    tools.renderFrame();
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    ImDrawData* draw_data = ImGui::GetDrawData();
+    const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(window.gpuDevice()); // Acquire a GPU command buffer
+
+    SDL_GPUTexture* swapchain_texture;
+    SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, window.window(), &swapchain_texture, nullptr, nullptr); // Acquire a swapchain texture
+
+    if (swapchain_texture != nullptr && !is_minimized)
+    {
+        // This is mandatory: call ImGui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
+        ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+
+        // Setup and start a render pass
+        SDL_GPUColorTargetInfo target_info = {};
+        target_info.texture = swapchain_texture;
+        target_info.clear_color = SDL_FColor { clear_color.x, clear_color.y, clear_color.z, clear_color.w };
+        target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+        target_info.store_op = SDL_GPU_STOREOP_STORE;
+        target_info.mip_level = 0;
+        target_info.layer_or_depth_plane = 0;
+        target_info.cycle = false;
+        SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+
+        // Render ImGui
+        ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+
+        SDL_EndGPURenderPass(render_pass);
+    }
+
+    // Submit the command buffer
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
     return SDL_APP_CONTINUE;
 }
 

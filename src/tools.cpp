@@ -71,7 +71,7 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
                             try {
                                 const auto& schema = ctx->getComponentSchema(cid);
                                 ImGui::Bullet();
-                                ImGui::Text("%s (id: %llu, size: %zu bytes)",
+                                ImGui::Text("%s (id: %lu, size: %zu bytes)",
                                     schema.name.c_str(),
                                     cid,
                                     schema.size);
@@ -83,7 +83,7 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
                     ImGui::TreePop();
                 }
             } catch (...) {
-                ImGui::Text("Error reading entity %llu", eid);
+                ImGui::Text("Error reading entity %lu", eid);
             }
         }
     }
