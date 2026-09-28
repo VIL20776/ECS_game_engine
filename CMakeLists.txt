@@ -126,15 +126,22 @@ if(BUILD_TESTS)
 
     add_executable(entity_component_test)
     target_sources(entity_component_test PRIVATE
+        ${IMGUI_SOURCES}
         ${ECS_SOURCES}
+        ${APP_SOURCES}
         tests/entity_component_test.cpp
     )
     target_include_directories(entity_component_test PRIVATE
         src/
         ${SDL3_SOURCE_DIR}/include
+        ${IMGUI_SOURCE_DIR}
+        ${IMGUI_SOURCE_DIR}/backends
     )
     target_link_libraries(entity_component_test PRIVATE
+        Lua::Lua
         tomlplusplus::tomlplusplus
+        LuaBridge3::LuaBridge
+        SDL3::SDL3
         Catch2::Catch2WithMain
     )
 
@@ -153,10 +160,10 @@ if(BUILD_TESTS)
     )
     target_link_libraries(toml_lua_test PRIVATE
         Lua::Lua
-        Catch2::Catch2WithMain
         tomlplusplus::tomlplusplus
         LuaBridge3::LuaBridge
         SDL3::SDL3
+        Catch2::Catch2WithMain
     )
 
     include(CTest)

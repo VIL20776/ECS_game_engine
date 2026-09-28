@@ -5,6 +5,7 @@
 #include "imgui_impl_sdlgpu3.h"
 
 #include "SDL3/SDL.h"
+#include "world.hpp"
 
 #include <expected>
 
@@ -22,6 +23,7 @@ public:
 
     [[nodiscard]] std::expected<void, ToolsError> init(SDL_Window* window, SDL_GPUDevice* gpu_device) noexcept;
     void newFrame() noexcept;
+    void entityViewerTool(ecs::World* ctx) noexcept;
     void renderFrame() noexcept;
     void shutdown() noexcept;
 

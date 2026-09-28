@@ -1,4 +1,8 @@
 #include "tools.hpp"
+#include "entity.hpp"
+#include "imgui.h"
+#include "world.hpp"
+#include <format>
 
 namespace app {
 
@@ -37,6 +41,27 @@ void ToolsManager::newFrame() noexcept {
     ImGui_ImplSDLGPU3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+}
+
+void ToolsManager::entityViewerTool(ecs::World *ctx) noexcept {
+    ImGui::Begin("Entity Viewer");
+
+    for (ecs::EntityId eid = 0; eid < ctx->getEntityCount(); eid++) {
+        auto& record = ctx->getEntityRecord(eid);
+
+        std::string entity_label = std::format("Entity %d", eid);
+        if (ImGui::TreeNode(entity_label.c_str())) {
+
+            for (auto cid: record.archetype->getComponentIds()) {
+                std::string component_name = ctx->getComponentSchema(cid).name;
+                ImGui::Text(component_name.c_str());
+            }
+
+            ImGui::TreePop();
+        }
+    }
+    
+    ImGui::End();
 }
 
 void ToolsManager::renderFrame() noexcept {

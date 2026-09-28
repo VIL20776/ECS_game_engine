@@ -66,6 +66,8 @@ int Game::update(double delta_time) {
     ImGui::ShowDemoWindow();
     systems.update(delta_time);
 
+    tools.entityViewerTool(&world);
+
     ImGui::Render();
     return SDL_APP_CONTINUE;
 }

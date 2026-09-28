@@ -27,6 +27,8 @@ auto load_components(WorldT& world, std::string_view file_name) {
 } // namespace
 
 TEST_CASE("TOML file reading") {
+    using namespace  ecs;
+
     World world;
     const auto defs = load_components(world, "valid.toml");
 
@@ -43,12 +45,14 @@ TEST_CASE("TOML file reading") {
         REQUIRE(defs->at(1).fields.at(1).name == "y");
         REQUIRE(defs->at(1).fields.at(1).type == ecs::FieldType::Float32);
     } else {
-        REQUIRE(defs.size() == 2);
-        REQUIRE(defs.at(0).name == "Position");
+        REQUIRE(defs->size() == 2);
+        REQUIRE(defs->at(0).name == "Position");
     }
 }
 
 TEST_CASE("Lua script loading and execution") {
+    using namespace  ecs;
+
     World world;
     const EntityId entity = world.createEntity();
 
@@ -103,16 +107,18 @@ TEST_CASE("Lua script loading and execution") {
         REQUIRE(update_result.has_value());
     }
 
-    const auto* expected_archetype = world.query(std::vector<ComponentId>{position_id}).back();
+    auto* expected_archetype = world.query(std::vector<ComponentId>{position_id}).back();
     const auto raw = expected_archetype->getRawComponent(entity, position_id);
     const auto new_x = readField<float>(world.getComponentSchema(position_id), raw, "x");
     const auto new_y = readField<float>(world.getComponentSchema(position_id), raw, "y");
 
-    REQUIRE(new_x == Approx(position_x + 10.0f / 60.0f));
-    REQUIRE(new_y == Approx(position_y + 10.0f / 60.0f));
+    REQUIRE(new_x == position_x + 10.0f / 60.0f);
+    REQUIRE(new_y == position_y + 10.0f / 60.0f);
 }
 
 TEST_CASE("Load invalid TOML file reports failure") {
+    using namespace ecs;
+
     World world;
     const auto defs = load_components(world, "invalid_component.toml");
 
@@ -122,6 +128,8 @@ TEST_CASE("Load invalid TOML file reports failure") {
 }
 
 TEST_CASE("Load invalid Lua script reports failure") {
+    using namespace ecs;
+
     World world;
     ecs::lua::SystemRuntime runtime(world);
     const auto script = tomlPath("invalid_system.lua");

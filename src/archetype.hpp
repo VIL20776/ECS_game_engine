@@ -66,7 +66,7 @@ class Archetype {
 
     std::span<const EntityId> getEntities();
 
-    bool hasComponent(ComponentId component_id);
+    bool hasComponent(ComponentId component_id) const;
 
     std::span<std::byte> getRawComponent(
         EntityId entity_id,

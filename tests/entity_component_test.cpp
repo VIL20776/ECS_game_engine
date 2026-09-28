@@ -102,7 +102,7 @@ TEST_CASE("Component data and archetype storage") {
     REQUIRE(world.getArchetypeCount() == 2);
 
     const std::vector<ComponentId> archetype_signature = {component_id};
-    const auto* expected_archetype = world.query(archetype_signature).back();
+    auto* expected_archetype = world.query(archetype_signature).back();
     REQUIRE(expected_archetype->hasComponent(component_id));
 
     const auto raw_component = expected_archetype->getRawComponent(ent, component_id);
@@ -228,7 +228,7 @@ TEST_CASE("Query archetypes and mutate fields") {
     REQUIRE(query.size() == 2);
 
     float value = 3.0f;
-    for (const auto* arch : query) {
+    for (auto* arch : query) {
         for (const auto eid : arch->getEntities()) {
             auto component_data = arch->getRawComponent(eid, component_id_1);
             auto field_x = readField<float>(world.getComponentSchema(component_id_1), component_data, "x");
@@ -280,8 +280,8 @@ TEST_CASE("World loads component definitions from TOML") {
         REQUIRE(definitions->at(1).name == "Rotation");
         REQUIRE(definitions->at(1).fields.at(1).name == "y");
     } else {
-        REQUIRE(definitions.size() == 2);
-        REQUIRE(definitions.at(0).name == "Position");
+        REQUIRE(definitions->size() == 2);
+        REQUIRE(definitions->at(0).name == "Position");
     }
 }
 
@@ -297,6 +297,8 @@ TEST_CASE("World rejects invalid TOML field types") {
 }
 
 TEST_CASE("Lua script updates component state") {
+    using namespace ecs::lua;
+
     World world;
     const EntityId entity = world.createEntity();
 
@@ -326,10 +328,10 @@ TEST_CASE("Lua script updates component state") {
 
     SystemRuntime runtime(world);
     const auto load_result = [&]() {
-        if constexpr (requires { runtime.loadFile(componentFilePath("valid_system.lua").string()); }) {
-            return runtime.loadFile(componentFilePath("valid_system.lua").string());
+        if constexpr (requires { runtime.loadFile(componentFilePath("valid.lua").string()); }) {
+            return runtime.loadFile(componentFilePath("valid.lua").string());
         } else {
-            runtime.loadFile(componentFilePath("valid_system.lua").string());
+            runtime.loadFile(componentFilePath("valid.lua").string());
             return true;
         }
     }();
@@ -351,16 +353,18 @@ TEST_CASE("Lua script updates component state") {
         REQUIRE(update_result.has_value());
     }
 
-    const auto* archetype = world.query(std::vector<ComponentId>{position_id}).back();
+    auto* archetype = world.query(std::vector<ComponentId>{position_id}).back();
     const auto raw = archetype->getRawComponent(entity, position_id);
     const float x = readField<float>(world.getComponentSchema(position_id), raw, "x");
     const float y = readField<float>(world.getComponentSchema(position_id), raw, "y");
 
-    REQUIRE(x == Approx(original_x + 10.0f / 60.0f));
-    REQUIRE(y == Approx(original_y + 10.0f / 60.0f));
+    REQUIRE(x == original_x + 10.0f / 60.0f);
+    REQUIRE(y == original_y + 10.0f / 60.0f);
 }
 
 TEST_CASE("Invalid Lua script is rejected") {
+    using namespace ecs::lua;
+
     World world;
     SystemRuntime runtime(world);
     const auto invalid_script = componentFilePath("invalid_system.lua");
@@ -388,11 +392,13 @@ TEST_CASE("World loads and preserves component definitions from TOML with multip
         REQUIRE(definitions->front().name == "Position");
         REQUIRE(definitions->back().name == "Rotation");
     } else {
-        REQUIRE(definitions.size() == 2);
+        REQUIRE(definitions->size() == 2);
     }
 }
 
 TEST_CASE("SystemRuntime handles invalid query definitions safely") {
+    using namespace ecs::lua;
+
     World world;
     SystemRuntime runtime(world);
     const auto invalid_query = componentFilePath("invalid_system.lua");

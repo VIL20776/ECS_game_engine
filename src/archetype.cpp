@@ -20,7 +20,7 @@ Archetype::getComponentIds() { return component_ids; }
 std::span<const EntityId>
 Archetype::getEntities() { return entities; }
 
-bool Archetype::hasComponent(ComponentId component_id) {
+bool Archetype::hasComponent(ComponentId component_id) const {
     return component_columns.contains(component_id);
 }
 

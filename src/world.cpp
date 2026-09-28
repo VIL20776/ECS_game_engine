@@ -32,7 +32,8 @@ const std::unordered_map<std::string, FieldType> type_map = {
 
 } // namespace
 
-std::expected<ComponentId, ComponentCreateError> World::createComponent(
+std::expected<ComponentId, ComponentCreateError> 
+World::createComponent(
     std::string_view name,
     const std::vector<ComponentField>& fields)
 {
@@ -52,7 +53,7 @@ std::expected<ComponentId, ComponentCreateError> World::createComponent(
     if (!schema.validate()) {
         return std::unexpected(ComponentCreateError::InvalidSchema);
     }
-    if (component_schemas.contains(schema.id)) {
+    if (component_schema_map.contains(schema.name)) {
         return std::unexpected(ComponentCreateError::DuplicateComponent);
     }
 
