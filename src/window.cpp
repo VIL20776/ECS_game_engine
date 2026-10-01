@@ -1,4 +1,5 @@
 #include "window.hpp"
+#include "SDL3/SDL_render.h"
 
 #include <print>
 
@@ -41,6 +42,7 @@ int WindowManager::handleEvent(const SDL_Event* event) const noexcept {
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;
     }
+
     return SDL_APP_CONTINUE;
 }
 
@@ -58,6 +60,10 @@ SDL_GPUDevice* WindowManager::gpuDevice() const noexcept {
 
 SDL_Window* WindowManager::window() const noexcept {
     return window_;
+}
+
+SDL_Renderer* WindowManager::renderer() const noexcept {
+    return renderer_;
 }
 
 void WindowManager::shutdown() noexcept {

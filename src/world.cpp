@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <print>
@@ -134,7 +135,8 @@ std::vector<Archetype*> World::query(std::span<const ComponentId> component_ids)
     return result;
 }
 
-std::expected<std::vector<ComponentDefinition>, ComponentLoadError> World::loadComponents(
+std::expected<std::vector<ComponentDefinition>, ComponentLoadError> 
+World::loadComponents(
     std::string_view file_path)
 {
     std::vector<ComponentDefinition> definitions;
@@ -174,6 +176,47 @@ std::expected<std::vector<ComponentDefinition>, ComponentLoadError> World::loadC
     }
 
     return definitions;
+}
+
+std::expected<std::vector<ecs::EntityId>, ComponentLoadError> 
+World::loadEntities(
+    std::string_view file_path)
+{
+    std::vector<ecs::EntityId> entities;
+    std::string entity_file_path{file_path};
+    toml::table tbl;
+
+    try {
+        tbl = toml::parse_file(entity_file_path);
+    } catch (const toml::parse_error&) {
+        return std::unexpected(ComponentLoadError::ParseError);
+    }
+
+    for (auto& item : tbl) {
+        auto* table = item.second.as_table();
+        if (table == nullptr) {
+            return std::unexpected(ComponentLoadError::InvalidDefinition);
+        }
+        
+        if (!table->contains("count") || !table->contains("components"))
+            return std::unexpected(ComponentLoadError::InvalidDefinition);
+
+        auto entity_count = table->get("count");
+        auto components = table->get("components")->as_array();
+
+        for (std::size_t count = 0; count < entity_count->value<long>(); count++) {
+            const auto eid = createEntity();
+            for (auto& component: *components) {
+                const auto component_name = component.value<std::string>();
+                const auto cid = component_schema_map.at(component_name.value()).id;
+
+                migrateEntity(eid, cid);
+                entities.push_back(eid);
+            }
+        }
+    }
+
+    return entities;
 }
 
 ComponentSchema& World::getComponentSchema(ComponentId component_id) { return component_schemas.at(component_id); }

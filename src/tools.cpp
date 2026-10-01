@@ -1,8 +1,12 @@
 #include "tools.hpp"
+#include "SDL3/SDL_events.h"
+#include "component.hpp"
 #include "entity.hpp"
 #include "imgui.h"
 #include "world.hpp"
+#include <cstring>
 #include <format>
+#include <optional>
 
 namespace app {
 
@@ -34,6 +38,13 @@ std::expected<void, ToolsError> ToolsManager::init(SDL_Window* window, SDL_GPUDe
     return {};
 }
 
+void ToolsManager::forwardEvent(SDL_Event* event) noexcept {
+    if (!initialized_) {
+        return;
+    }
+    ImGui_ImplSDL3_ProcessEvent(event);
+}
+
 void ToolsManager::newFrame() noexcept {
     if (!initialized_) {
         return;
@@ -43,13 +54,14 @@ void ToolsManager::newFrame() noexcept {
     ImGui::NewFrame();
 }
 
+std::optional<ecs::EntityId> selected_eid;
+std::optional<ecs::ComponentId> selected_cid;
+
 void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
     if (!initialized_ || ctx == nullptr) {
         return;
     }
-    ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 360.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
     ImGui::Begin("Entity Viewer");
 
     const auto entity_ids = ctx->getAllEntityIds();
@@ -64,6 +76,7 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
                 const auto& record = ctx->getEntityRecord(eid);
                 const std::string entity_label = std::format("Entity {}", eid);
 
+                ImGui::PushID(eid);
                 if (ImGui::TreeNode(entity_label.c_str())) {
                     const auto component_ids = record.archetype->getComponentIds();
                     if (component_ids.empty()) {
@@ -72,11 +85,16 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
                         for (const auto cid : component_ids) {
                             try {
                                 const auto& schema = ctx->getComponentSchema(cid);
+                                const std::string component_label = std::format("{} (size: {} bytes)", schema.name.c_str(), schema.size);
+
+                                ImGui::PushID(cid);
                                 ImGui::Bullet();
-                                ImGui::Text("%s (id: %lu, size: %zu bytes)",
-                                    schema.name.c_str(),
-                                    cid,
-                                    schema.size);
+
+                                if (ImGui::Selectable(component_label.c_str())) {
+                                    selected_eid = eid;
+                                    selected_cid = schema.id;
+                                }
+                                ImGui::PopID();
                             } catch (...) {
                                 ImGui::Text("  <error reading component>");
                             }
@@ -84,6 +102,7 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
                     }
                     ImGui::TreePop();
                 }
+                ImGui::PopID();
             } catch (...) {
                 ImGui::Text("Error reading entity %lu", eid);
             }
@@ -91,6 +110,75 @@ void ToolsManager::entityViewerTool(ecs::World* ctx) noexcept {
     }
 
     ImGui::End();
+}
+
+void ToolsManager::componentViewerTool(ecs::World *ctx) noexcept {
+    if (!initialized_ || ctx == nullptr) {
+        return;
+    }
+    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Component Viewer");
+
+
+    if (!selected_eid.has_value() || !selected_cid.has_value()) {
+        ImGui::Text("No entity selected");
+    } else {
+        const auto eid = selected_eid.value();
+        const auto cid = selected_cid.value();
+
+        const auto record = ctx->getEntityRecord(eid);
+        const auto schema = ctx->getComponentSchema(cid);
+
+        ImGui::Text("Entity %zu: %s", eid, schema.name.c_str());
+        ImGui::Separator();
+
+        const auto data = record.archetype->getRawComponent(eid, cid);
+        for (const auto field : schema.fields) {
+            try {
+                std::string component_label;
+                const auto field_data = ecs::getFieldBytes(schema, data, field.name);
+                
+                ImGui::Bullet();
+                switch (field.type) {
+                    case ecs::FieldType::Float32: 
+                        {
+                            float value;
+                            std::memcpy(&value, field_data.data(), sizeof(float));
+                            ImGui::Text("%s: %.2f (type: Float32)", field.name.c_str(), value);       
+                        }
+                        break;
+                    case ecs::FieldType::Int32:
+                        {
+                            int value;
+                            std::memcpy(&value, field_data.data(), sizeof(int));
+                            ImGui::Text("%s: %x (type: Int32)", field.name.c_str(), value);       
+                        }
+                        break;
+                    case ecs::FieldType::Bool:
+                        {
+                            bool value;
+                            std::memcpy(&value, field_data.data(), sizeof(bool));
+                            if (value) ImGui::Text("%s: true (type: Bool)", field.name.c_str());       
+                            else ImGui::Text("%s: false (type: Bool)", field.name.c_str());       
+                        }
+                        break;
+                    case ecs::FieldType::Bytes:
+                        {
+                            char value;
+                            std::memcpy(&value, field_data.data(), sizeof(char));
+                            ImGui::Text("%s: %x (type: Byte)", field.name.c_str(), value);       
+                        }
+                        break;
+                }
+
+            } catch (...) {
+                ImGui::Text("  <error reading component>");
+            }
+        }
+    }
+
+    ImGui::End();
+    
 }
 
 void ToolsManager::renderFrame() noexcept {

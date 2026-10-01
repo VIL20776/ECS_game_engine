@@ -78,7 +78,6 @@ std::int64_t ComponentView::readInt(std::string_view field_name) const {
 }
 
 double ComponentView::readFloat(std::string_view field_name) const {
-    std::println("Reading float");
     auto* field = schema_->findField(field_name);
     return static_cast<double>(readValue<float>(raw(), field->offset));
 }
@@ -94,7 +93,6 @@ void ComponentView::writeInt(std::string_view field_name, int value) {
 }
 
 void ComponentView::writeFloat(std::string_view field_name, double value) {
-    std::println("writing float");
     auto* field = schema_->findField(field_name);
     writeValue(raw(), field->offset, static_cast<float>(value));
 }

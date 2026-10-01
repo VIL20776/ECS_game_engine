@@ -1,5 +1,10 @@
 #include "game.hpp"
+#include "SDL3/SDL_rect.h"
+#include "SDL3/SDL_render.h"
+#include "component.hpp"
+#include "entity.hpp"
 
+#include <cstring>
 #include <print>
 #include <string>
 
@@ -7,7 +12,7 @@ namespace game {
 
 Game::Game() : systems(world) {}
 
-std::expected<void, GameError> Game::setup(std::string_view component_file, std::string_view systems_file) {
+std::expected<void, GameError> Game::setup(std::string_view component_file, std::string_view entity_file, std::string_view systems_file) {
     const auto definitions = world.loadComponents(component_file);
     if (!definitions.has_value()) {
         return std::unexpected(GameError::ComponentLoadFailed);
@@ -18,6 +23,11 @@ std::expected<void, GameError> Game::setup(std::string_view component_file, std:
         if (!result.has_value()) {
             return std::unexpected(GameError::ComponentLoadFailed);
         }
+    }
+
+    const auto entity_result = world.loadEntities(entity_file);
+    if (!entity_result.has_value()) {
+        return std::unexpected(GameError::EntityLoadFailed); 
     }
 
     const auto system_result = systems.loadFile(systems_file);
@@ -57,17 +67,22 @@ int Game::input(SDL_Event* event, double delta_time) {
             stop();
         }
     }
+
+    tools.forwardEvent(event);
     return SDL_APP_CONTINUE;
 }
 
 int Game::update(double delta_time) {
     tools.newFrame();
     tools.entityViewerTool(&world);
+    tools.componentViewerTool(&world);
 
     const auto update_result = systems.update(delta_time);
     if (!update_result.has_value()) {
         return SDL_APP_FAILURE;
     }
+
+    renderSDLComponents();
 
     tools.renderFrame();
 
@@ -121,6 +136,36 @@ int Game::quit() noexcept {
 
 bool Game::isRunning() const noexcept {
     return is_running;
+}
+
+void Game::renderSDLComponents() noexcept {
+    // SDL Rects
+    const auto rect_schema = world.getComponentSchema("Rectangle");
+    const auto archetypes = world.query(std::vector<ecs::ComponentId>{rect_schema.id});
+
+    for (auto* arch: archetypes) {
+        SDL_FRect rect;
+        for (auto eid: arch->getEntities()) {
+            auto data = arch->getRawComponent(eid, rect_schema.id);
+
+            auto data_x = ecs::getFieldBytes(rect_schema, data, "x");
+            auto data_y = ecs::getFieldBytes(rect_schema, data, "y");
+            auto data_h = ecs::getFieldBytes(rect_schema, data, "h");
+            auto data_w = ecs::getFieldBytes(rect_schema, data, "w");
+
+            std::memcpy(&rect.x, data_x.data(), sizeof(float));
+            std::memcpy(&rect.y, data_y.data(), sizeof(float));
+            std::memcpy(&rect.h, data_h.data(), sizeof(float));
+            std::memcpy(&rect.w, data_w.data(), sizeof(float));
+
+            const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+            ImGui::GetBackgroundDrawList()->AddRectFilled(
+                    ImVec2(origin.x + rect.x,          origin.y + rect.y),
+                    ImVec2(origin.x + rect.x + rect.w + 10, origin.y + rect.y + rect.h + 10),
+                    IM_COL32(255, 100, 50, 255)
+                    );
+        }
+    }
 }
 
 } // namespace game

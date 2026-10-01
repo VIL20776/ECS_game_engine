@@ -37,7 +37,9 @@ class World {
 public:
     World() = default;
 
-    [[nodiscard]] std::expected<ComponentId, ComponentCreateError> createComponent(
+    [[nodiscard]] 
+    std::expected<ComponentId, ComponentCreateError> 
+    createComponent(
         std::string_view name,
         const std::vector<ComponentField>& fields);
 
@@ -56,8 +58,13 @@ public:
 
     [[nodiscard]] std::vector<Archetype*> query(std::span<const ComponentId> component_ids);
 
-    [[nodiscard]] std::expected<std::vector<ComponentDefinition>, ComponentLoadError> loadComponents(
-        std::string_view file_path);
+    [[nodiscard]] 
+    std::expected<std::vector<ComponentDefinition>, ComponentLoadError> 
+    loadComponents(std::string_view file_path);
+
+    [[nodiscard]] 
+    std::expected<std::vector<ecs::EntityId>, ComponentLoadError> 
+    loadEntities(std::string_view file_path);
 
     [[nodiscard]] ComponentSchema& getComponentSchema(ComponentId component_id);
     [[nodiscard]] ComponentSchema& getComponentSchema(const std::string& component_name);

@@ -21,9 +21,14 @@ class ToolsManager {
 public:
     ToolsManager() = default;
 
-    [[nodiscard]] std::expected<void, ToolsError> init(SDL_Window* window, SDL_GPUDevice* gpu_device) noexcept;
+    [[nodiscard]]
+    std::expected<void, ToolsError> 
+    init(SDL_Window* window, SDL_GPUDevice* gpu_device) noexcept;
+
     void newFrame() noexcept;
+    void forwardEvent(SDL_Event* event) noexcept;
     void entityViewerTool(ecs::World* ctx) noexcept;
+    void componentViewerTool(ecs::World* ctx) noexcept;
     void renderFrame() noexcept;
     void shutdown() noexcept;
 

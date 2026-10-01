@@ -25,12 +25,14 @@ public:
     [[nodiscard]] SDL_Window* nativeWindow() const noexcept;
     [[nodiscard]] SDL_GPUDevice* gpuDevice() const noexcept;
     [[nodiscard]] SDL_Window* window() const noexcept;
+    [[nodiscard]] SDL_Renderer* renderer() const noexcept;
 
     void shutdown() noexcept;
 
 private:
     SDL_Window* window_{nullptr};
     SDL_GPUDevice* gpu_device_{nullptr};
+    SDL_Renderer* renderer_{nullptr};
 };
 
 } // namespace app
