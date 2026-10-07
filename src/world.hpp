@@ -57,6 +57,7 @@ public:
     void removeComponent(EntityId entity_id, ComponentId component_id);
 
     [[nodiscard]] std::vector<Archetype*> query(std::span<const ComponentId> component_ids);
+    [[nodiscard]] std::vector<Archetype*> query();
 
     [[nodiscard]] 
     std::expected<std::vector<ComponentDefinition>, ComponentLoadError> 

@@ -111,7 +111,8 @@ SystemRuntime::SystemRuntime(World& world) : world_(world), lua_state_(luaL_news
 }
 
 SystemRuntime::~SystemRuntime() {
-    systems_.clear();
+    systems_setup.clear();
+    systems_update.clear();
     if (lua_state_ != nullptr) {
         lua_close(lua_state_);
     }
@@ -130,8 +131,15 @@ void SystemRuntime::registerBindings() {
                 .addFunction("writeFloat", &ComponentView::writeFloat)
                 .addFunction("writeBool", &ComponentView::writeBool)
             .endClass()
-            .addFunction("system", [this](const std::string& name, const luabridge::LuaRef& query, const luabridge::LuaRef& update) {
-                registerSystem(name, query, update);
+            .addFunction("setup", [this](const std::string& name, const luabridge::LuaRef& query, const luabridge::LuaRef& update) {
+                const auto result = registerSystem(systems_setup, name, query, update);
+                if (!result.has_value())
+                    std::println("Error: Could not register setup system");
+            })
+            .addFunction("update", [this](const std::string& name, const luabridge::LuaRef& query, const luabridge::LuaRef& update) {
+                const auto result = registerSystem(systems_update, name, query, update);
+                if (!result.has_value())
+                    std::println("Error: Could not register setup system");
             })
         .endNamespace();
 }
@@ -170,16 +178,18 @@ std::expected<std::vector<ComponentId>, LuaRuntimeError> SystemRuntime::readQuer
 }
 
 std::expected<void, LuaRuntimeError> SystemRuntime::registerSystem(
-    const std::string& name,
-    const luabridge::LuaRef& query,
-    const luabridge::LuaRef& update) {
+        std::vector<System>& systems,
+        const std::string& name,
+        const luabridge::LuaRef& query,
+        const luabridge::LuaRef& update) 
+{
     if (name.empty()) {
         return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
     if (!update.isFunction()) {
         return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
-    if (std::any_of(systems_.begin(), systems_.end(), [&](const System& system) { return system.name == name; })) {
+    if (std::any_of(systems.begin(), systems.end(), [&](const System& system) { return system.name == name; })) {
         return std::unexpected(LuaRuntimeError::SystemRegistrationFailed);
     }
 
@@ -187,11 +197,28 @@ std::expected<void, LuaRuntimeError> SystemRuntime::registerSystem(
     if (!query_result.has_value()) {
         return std::unexpected(query_result.error());
     }
-    systems_.push_back(System{name, query_result.value(), update});
+    systems.push_back(System{name, query_result.value(), update});
     return {};
 }
 
-std::expected<void, LuaRuntimeError> SystemRuntime::loadFile(std::string_view file_name) {
+/*
+void SystemRuntime::reset(World &world) {
+    systems_setup.clear();
+    systems_update.clear();
+    if (lua_state_ != nullptr) {
+        lua_close(lua_state_);
+    }
+
+    world_ = world;
+    lua_state_ = luaL_newstate();
+    luaL_openlibs(lua_state_);
+    registerBindings(); 
+}
+*/
+
+std::expected<void, LuaRuntimeError> 
+SystemRuntime::loadFile(std::string_view file_name) 
+{
     std::string filename{file_name};
     if (luaL_loadfile(lua_state_, filename.c_str()) != LUA_OK) {
         const std::string message = lua_tostring(lua_state_, -1);
@@ -218,8 +245,27 @@ luabridge::LuaRef SystemRuntime::makeComponentTable(
     return components;
 }
 
+std::expected<void, LuaRuntimeError> SystemRuntime::setup() {
+    for (const System& system : systems_setup) {
+        const auto archetypes = world_.query(system.query);
+        for (Archetype* archetype : archetypes) {
+            const auto entity_span = archetype->getEntities();
+            const std::vector<EntityId> entities(entity_span.begin(), entity_span.end());
+
+            for (EntityId entity_id : entities) {
+                auto components = makeComponentTable(*archetype, entity_id, system);
+                auto result = system.update(entity_id, components);
+                if (!result) {
+                    return std::unexpected(LuaRuntimeError::SystemExecutionFailed);
+                }
+            }
+        }
+    }
+    return {};
+}
+
 std::expected<void, LuaRuntimeError> SystemRuntime::update(double delta_time) {
-    for (const System& system : systems_) {
+    for (const System& system : systems_update) {
         const auto archetypes = world_.query(system.query);
         for (Archetype* archetype : archetypes) {
             const auto entity_span = archetype->getEntities();

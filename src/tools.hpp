@@ -11,6 +11,8 @@
 
 namespace app {
 
+typedef int (*FunctionCall)() ;
+
 enum class ToolsError {
     ImGuiContextFailed,
     SdlGuiBackendFailed,
@@ -27,8 +29,12 @@ public:
 
     void newFrame() noexcept;
     void forwardEvent(SDL_Event* event) noexcept;
+
     void entityViewerTool(ecs::World* ctx) noexcept;
     void componentViewerTool(ecs::World* ctx) noexcept;
+    void archetypeViewerTool(ecs::World* ctx) noexcept;
+    void toolBar(FunctionCall start, FunctionCall stop, FunctionCall reload) noexcept;
+
     void renderFrame() noexcept;
     void shutdown() noexcept;
 

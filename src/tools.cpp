@@ -1,5 +1,5 @@
 #include "tools.hpp"
-#include "SDL3/SDL_events.h"
+
 #include "component.hpp"
 #include "entity.hpp"
 #include "imgui.h"
@@ -177,8 +177,77 @@ void ToolsManager::componentViewerTool(ecs::World *ctx) noexcept {
         }
     }
 
-    ImGui::End();
+    ImGui::End(); 
+}
+
+void ToolsManager::archetypeViewerTool(ecs::World *ctx) noexcept {
+    if (!initialized_ || ctx == nullptr) {
+        return;
+    }
     
+    ImGui::Begin("Archetype Viewer");
+    const auto archetypes = ctx->query();
+
+    if (archetypes.empty()) {
+        ImGui::Text("No archetypes in the world");
+    } else {
+        ImGui::Text("Total archetypes: %zu", archetypes.size());
+        ImGui::Separator();
+
+        for (const auto arch : archetypes) {
+            try {
+                const auto components = arch->getComponentIds();
+                const auto entities = arch->getEntities();
+
+                std::string archetype_label;
+                for (auto cid: components) {
+                    archetype_label += ctx->getComponentSchema(cid).name + ",";
+                }
+
+                if (archetype_label.empty()) 
+                    archetype_label = "  (no components)";
+                else
+                    archetype_label.pop_back();
+
+                if (ImGui::TreeNode((archetype_label + "##").c_str())) {
+                    if (entities.empty()) {
+                        ImGui::Text("  (no entities)");
+                    } else {
+                        std::size_t i = 0;
+                        for (const auto eid : entities) {
+                            ImGui::Bullet();
+                            ImGui::Text("[%lu] Entity %lu", i++, eid); 
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+            } catch (...) {
+                ImGui::Text("Error reading archetype");
+            }
+        }
+    }
+
+    ImGui::End(); 
+}
+
+void ToolsManager::toolBar(FunctionCall start, FunctionCall stop, FunctionCall reload) noexcept {
+    if (!initialized_) {
+        return;
+    }
+
+    ImGui::Begin("##Toolbar");
+    if (ImGui::Button("Play") && start != nullptr) {
+        start();
+    }
+
+    if (ImGui::Button("Stop") && stop != nullptr) {
+        stop();
+    }
+
+    if (ImGui::Button("Reload") && reload != nullptr) {
+        reload();
+    }
+    ImGui::End(); 
 }
 
 void ToolsManager::renderFrame() noexcept {

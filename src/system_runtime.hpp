@@ -60,7 +60,9 @@ public:
     SystemRuntime(const SystemRuntime&) = delete;
     SystemRuntime& operator=(const SystemRuntime&) = delete;
 
+    // void reset(World& world);
     [[nodiscard]] std::expected<void, LuaRuntimeError> loadFile(std::string_view file_name);
+    [[nodiscard]] std::expected<void, LuaRuntimeError> setup();
     [[nodiscard]] std::expected<void, LuaRuntimeError> update(double delta_time);
 
 private:
@@ -71,16 +73,20 @@ private:
     };
 
     void registerBindings();
-    [[nodiscard]] std::expected<void, LuaRuntimeError> registerSystem(
-        const std::string& name,
-        const luabridge::LuaRef& query,
-        const luabridge::LuaRef& update);
+
+    [[nodiscard]]
+    std::expected<void, LuaRuntimeError> 
+    registerSystem(
+            std::vector<System>& systems,
+            const std::string& name,
+            const luabridge::LuaRef& query,
+            const luabridge::LuaRef& update);
     [[nodiscard]] std::expected<std::vector<ComponentId>, LuaRuntimeError> readQuery(const luabridge::LuaRef& query) const;
     [[nodiscard]] luabridge::LuaRef makeComponentTable(Archetype& archetype, EntityId entity_id, const System& system);
 
     World& world_;
     lua_State* lua_state_{nullptr};
-    std::vector<System> systems_;
+    std::vector<System> systems_update, systems_setup;
 };
 
 } // namespace ecs::lua

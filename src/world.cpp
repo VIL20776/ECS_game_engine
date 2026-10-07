@@ -135,6 +135,15 @@ std::vector<Archetype*> World::query(std::span<const ComponentId> component_ids)
     return result;
 }
 
+std::vector<Archetype*> World::query() {
+    std::vector<Archetype*> result;
+    for (auto& [archetype_id, archetype_ptr] : archetypes) {
+        (void)archetype_id;
+        result.push_back(archetype_ptr.get());
+    }
+    return result;
+}
+
 std::expected<std::vector<ComponentDefinition>, ComponentLoadError> 
 World::loadComponents(
     std::string_view file_path)

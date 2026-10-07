@@ -3,16 +3,18 @@
 #include "SDL3/SDL_render.h"
 #include "component.hpp"
 #include "entity.hpp"
+#include "world.hpp"
 
 #include <cstring>
 #include <print>
 #include <string>
 
-namespace game {
+namespace app {
 
 Game::Game() : systems(world) {}
 
 std::expected<void, GameError> Game::setup(std::string_view component_file, std::string_view entity_file, std::string_view systems_file) {
+    this->component_file = component_file;
     const auto definitions = world.loadComponents(component_file);
     if (!definitions.has_value()) {
         return std::unexpected(GameError::ComponentLoadFailed);
@@ -25,11 +27,13 @@ std::expected<void, GameError> Game::setup(std::string_view component_file, std:
         }
     }
 
+    this->entity_file = entity_file;
     const auto entity_result = world.loadEntities(entity_file);
     if (!entity_result.has_value()) {
         return std::unexpected(GameError::EntityLoadFailed); 
     }
 
+    this->systems_file = systems_file;
     const auto system_result = systems.loadFile(systems_file);
     if (!system_result.has_value()) {
         return std::unexpected(GameError::SystemLoadFailed);
@@ -45,11 +49,6 @@ std::expected<void, GameError> Game::setup(std::string_view component_file, std:
 
     is_running = false;
     return {};
-}
-
-int Game::start() noexcept {
-    is_running = true;
-    return SDL_APP_CONTINUE;
 }
 
 int Game::input(SDL_Event* event, double delta_time) {
@@ -73,14 +72,33 @@ int Game::input(SDL_Event* event, double delta_time) {
 }
 
 int Game::update(double delta_time) {
-    tools.newFrame();
-    tools.entityViewerTool(&world);
-    tools.componentViewerTool(&world);
-
     const auto update_result = systems.update(delta_time);
     if (!update_result.has_value()) {
         return SDL_APP_FAILURE;
     }
+    return SDL_APP_CONTINUE;
+}
+
+int Game::render() {
+    tools.newFrame();
+
+    tools.entityViewerTool(&world);
+    tools.componentViewerTool(&world);
+    tools.archetypeViewerTool(&world);
+
+    ImGui::Begin("Toolbar");
+    if (ImGui::Button("Play")) {
+        start();
+    }
+
+    if (ImGui::Button("Stop")) {
+        stop();
+    }
+
+    if (ImGui::Button("Reload")) {
+        reload();
+    }
+    ImGui::End();
 
     renderSDLComponents();
 
@@ -123,9 +141,44 @@ int Game::update(double delta_time) {
     return SDL_APP_CONTINUE;
 }
 
-int Game::stop() noexcept {
+void Game::start() noexcept {
+    const auto update_result = systems.setup();
+    if (!update_result.has_value()) {
+        return;
+    }
+    is_running = true;
+}
+
+void Game::reload() noexcept {
+    this->world = ecs::World();
+    // systems.reset(world);
+
+    const auto definitions = world.loadComponents(component_file);
+    if (!definitions.has_value()) {
+        // return std::unexpected(GameError::ComponentLoadFailed);
+    }
+
+    for (const auto& def : definitions.value()) {
+        const auto result = world.createComponent(def.name, def.fields);
+        if (!result.has_value()) {
+            // return std::unexpected(GameError::ComponentLoadFailed);
+        }
+    }
+
+    const auto entity_result = world.loadEntities(entity_file);
+    if (!entity_result.has_value()) {
+        // return std::unexpected(GameError::EntityLoadFailed); 
+    }
+
+    const auto system_result = systems.loadFile(systems_file);
+    if (!system_result.has_value()) {
+        // return std::unexpected(GameError::SystemLoadFailed);
+    }
     is_running = false;
-    return SDL_APP_CONTINUE;
+}
+
+void Game::stop() noexcept {
+    is_running = false;
 }
 
 int Game::quit() noexcept {

@@ -15,7 +15,10 @@ constexpr std::string_view kDefaultSystemsFile = "./systems.lua";
 
 } // namespace
 
-game::Game ctx;
+app::Game ctx;
+
+double NOW = 0;
+double LAST = 0;
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     (void)appstate;
@@ -28,6 +31,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
             !result.has_value()) {
         return SDL_APP_FAILURE;
     }
+
+    NOW = SDL_GetPerformanceCounter();
     return SDL_APP_CONTINUE;
 }
 
@@ -45,11 +50,20 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 
 SDL_AppResult SDL_AppIterate(void* appstate) {
     (void)appstate;
-    const auto fps = (double)SDL_GetTicks() / 1000;
+
+    LAST = NOW;
+    NOW = SDL_GetPerformanceCounter();
+
+    const auto delta_time = (double)((NOW - LAST)*1000 / (double)SDL_GetPerformanceFrequency());
+
+    SDL_AppResult result;
     if (ctx.isRunning()) {
-        if (const auto error = (SDL_AppResult)ctx.update(fps); error != SDL_APP_CONTINUE)
-            return error;
+        if (result = (SDL_AppResult)ctx.update(delta_time); result != SDL_APP_CONTINUE)
+            return result;
     }
+    if (result = (SDL_AppResult)ctx.render(); result != SDL_APP_CONTINUE)
+        return result;
+
     return SDL_APP_CONTINUE;
 }
 
