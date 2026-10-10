@@ -150,8 +150,8 @@ void Game::start() noexcept {
 }
 
 void Game::reload() noexcept {
-    this->world = ecs::World();
-    // systems.reset(world);
+    world = ecs::World();
+    systems.reset(world);
 
     const auto definitions = world.loadComponents(component_file);
     if (!definitions.has_value()) {

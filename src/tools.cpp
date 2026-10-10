@@ -233,21 +233,7 @@ void ToolsManager::archetypeViewerTool(ecs::World *ctx) noexcept {
 void ToolsManager::toolBar(FunctionCall start, FunctionCall stop, FunctionCall reload) noexcept {
     if (!initialized_) {
         return;
-    }
-
-    ImGui::Begin("##Toolbar");
-    if (ImGui::Button("Play") && start != nullptr) {
-        start();
-    }
-
-    if (ImGui::Button("Stop") && stop != nullptr) {
-        stop();
-    }
-
-    if (ImGui::Button("Reload") && reload != nullptr) {
-        reload();
-    }
-    ImGui::End(); 
+    } 
 }
 
 void ToolsManager::renderFrame() noexcept {

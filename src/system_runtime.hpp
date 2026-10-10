@@ -60,7 +60,7 @@ public:
     SystemRuntime(const SystemRuntime&) = delete;
     SystemRuntime& operator=(const SystemRuntime&) = delete;
 
-    // void reset(World& world);
+    void reset(World& world);
     [[nodiscard]] std::expected<void, LuaRuntimeError> loadFile(std::string_view file_name);
     [[nodiscard]] std::expected<void, LuaRuntimeError> setup();
     [[nodiscard]] std::expected<void, LuaRuntimeError> update(double delta_time);

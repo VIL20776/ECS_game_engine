@@ -139,7 +139,7 @@ void SystemRuntime::registerBindings() {
             .addFunction("update", [this](const std::string& name, const luabridge::LuaRef& query, const luabridge::LuaRef& update) {
                 const auto result = registerSystem(systems_update, name, query, update);
                 if (!result.has_value())
-                    std::println("Error: Could not register setup system");
+                    std::println("Error: Could not register update system");
             })
         .endNamespace();
 }
@@ -201,7 +201,6 @@ std::expected<void, LuaRuntimeError> SystemRuntime::registerSystem(
     return {};
 }
 
-/*
 void SystemRuntime::reset(World &world) {
     systems_setup.clear();
     systems_update.clear();
@@ -209,12 +208,11 @@ void SystemRuntime::reset(World &world) {
         lua_close(lua_state_);
     }
 
-    world_ = world;
+    world_ = std::move(world);
     lua_state_ = luaL_newstate();
     luaL_openlibs(lua_state_);
     registerBindings(); 
 }
-*/
 
 std::expected<void, LuaRuntimeError> 
 SystemRuntime::loadFile(std::string_view file_name) 
