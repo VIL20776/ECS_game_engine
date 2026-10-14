@@ -228,6 +228,10 @@ World::loadEntities(
     return entities;
 }
 
+const bool World::componentExists(const std::string &component_name) {
+    return component_schema_map.contains(component_name);
+}
+
 ComponentSchema& World::getComponentSchema(ComponentId component_id) { return component_schemas.at(component_id); }
 
 ComponentSchema& World::getComponentSchema(const std::string& component_name) { return component_schema_map.at(component_name); }

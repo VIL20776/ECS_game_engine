@@ -1,4 +1,5 @@
 #include "game.hpp"
+#include "SDL3/SDL_keycode.h"
 #include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
 #include "component.hpp"
@@ -67,6 +68,25 @@ int Game::input(SDL_Event* event, double delta_time) {
         }
     }
 
+    if (world.componentExists("Axis")) {
+        float axis_x = 0;
+        float axis_y = 0;
+
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_UP)
+            axis_y -= 1;
+
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_DOWN)
+            axis_y += 1;
+
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_LEFT)
+            axis_x -= 1;
+
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RIGHT)
+            axis_x += 1;
+
+        handleAxisComponent(axis_x, axis_y);
+    }
+
     tools.forwardEvent(event);
     return SDL_APP_CONTINUE;
 }
@@ -100,7 +120,8 @@ int Game::render() {
     }
     ImGui::End();
 
-    renderSDLComponents();
+    if (world.componentExists("Rectangle"))
+        renderSDLComponents();
 
     tools.renderFrame();
 
@@ -217,6 +238,24 @@ void Game::renderSDLComponents() noexcept {
                     ImVec2(origin.x + rect.x + rect.w + 10, origin.y + rect.y + rect.h + 10),
                     IM_COL32(255, 100, 50, 255)
                     );
+        }
+    }
+}
+
+void Game::handleAxisComponent(float x, float y) noexcept {
+    // SDL Rects
+    const auto axis_schema = world.getComponentSchema("Axis");
+    const auto archetypes = world.query(std::vector<ecs::ComponentId>{axis_schema.id});
+
+    for (auto* arch: archetypes) {
+        for (auto eid: arch->getEntities()) {
+            auto data = arch->getRawComponent(eid, axis_schema.id);
+
+            auto data_x = ecs::getFieldBytes(axis_schema, data, "x");
+            auto data_y = ecs::getFieldBytes(axis_schema, data, "y");
+
+            std::memcpy(data_x.data(), &x, sizeof(float));
+            std::memcpy(data_y.data(), &y, sizeof(float));
         }
     }
 }

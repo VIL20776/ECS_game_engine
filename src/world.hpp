@@ -67,6 +67,8 @@ public:
     std::expected<std::vector<ecs::EntityId>, ComponentLoadError> 
     loadEntities(std::string_view file_path);
 
+    [[nodiscard]] const bool componentExists(const std::string& component_name);
+
     [[nodiscard]] ComponentSchema& getComponentSchema(ComponentId component_id);
     [[nodiscard]] ComponentSchema& getComponentSchema(const std::string& component_name);
 

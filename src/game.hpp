@@ -38,6 +38,7 @@ public:
 
 private:
     void renderSDLComponents() noexcept;
+    void handleAxisComponent(float x, float y) noexcept;
 
     ecs::World world;
     ecs::lua::SystemRuntime systems;
